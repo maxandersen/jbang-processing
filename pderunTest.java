@@ -15,8 +15,10 @@ import java.nio.file.Paths;
 
 import org.junit.jupiter.api.Test;
 
+import dev.jbang.jash.Jash;
+
 // Run this with junit:
-// `jbang build genTest.java; jbang --java 22 cli@junit-team --class-path `jbang genTest.java` --scan-classpath
+// `jbang --java `jbang info tools --select=requestedJavaVersion gavsearch@jbangdev` junit@junit-team --class-path `jbang info classpath genTest.java` --scan-classpath
 public class pderunTest {
 
     // Define each Unit test here and run them separately in the IDE
@@ -46,8 +48,13 @@ public class pderunTest {
         var result = pderun.decodePdeUrl(Files.readString(Paths.get("samples/animatedsprite.pdelink")));
 
         assertThat(result.source).contains("Animated Sprite (Shifty + Teddy)");
-        assertThat(result.files).hasSize(0);
+        assertThat(result.files).hasSize(98);
         assertThat(result.extraSources).isEmpty();
     }
 
+   
+    public static void main(String[] args) {
+//DEPS dev.jbang:jash:0.0.3
+                Jash.$("\"jbang --java 22+ junit@junit-team --class-path `jbang info classpath pderunTest.java` --scan-classpath\"").join();
+            }
 }

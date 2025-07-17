@@ -1,0 +1,10 @@
+{
+  "catalogs": {},
+  "aliases": {
+    "pderun": {
+      "script-ref": "pderun.java",
+      "java-agents": []
+    }
+  },
+  "templates": {}
+}

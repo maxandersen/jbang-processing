@@ -1,6 +1,7 @@
 ///usr/bin/env jbang "$0" "$@" ; exit $?
 //DEPS org.processing:preprocessor:4.4.4
 //REPOS central,https://jogamp.org/deployment/maven
+
 //JAVA 22+
 
 
@@ -15,6 +16,7 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import processing.mode.java.preproc.PdePreprocessor;
@@ -83,33 +85,35 @@ class pderun {
                     String value = param.substring(5);
                     
                     // Support multiple files in one data=, separated by commas
-                    String[] pairs = value.split(",");
-                    for (String pair : pairs) {
-                        int colonIdx = pair.indexOf(':');
-                        if (colonIdx > 0 && colonIdx < pair.length() - 1) {
-                            String filename = pair.substring(0, colonIdx);
-                            String fileurl = pair.substring(colonIdx + 1);
-                            byte[] srcDecoded = java.util.Base64.getDecoder().decode(fileurl);
-                            String src = new String(srcDecoded);
-                            result.addFile(filename, src);
-                        }
-                    }
+                    result.files.putAll(getPairs(value));
                 } else if (param.startsWith("pde=")) {
                     String value = param.substring(4);
                     // Support multiple pde files in one pde=, separated by commas
-                    String[] pairs = value.split(",");
-                    for (String pair : pairs) {
-                        int colonIdx = pair.indexOf(':');
-                        if (colonIdx > 0 && colonIdx < pair.length() - 1) {
-                            String filename = pair.substring(0, colonIdx);
-                            String base64src = pair.substring(colonIdx + 1);
-                            System.err.println(filename + "=" + base64src);
-                            byte[] srcDecoded = java.util.Base64.getDecoder().decode(base64src);
-                            String src = new String(srcDecoded);
-                            result.extraSources.put(filename, src);
-                        }
-                    }
+
+                    result.extraSources.putAll(getPairs(value,true));
                 }
+            }
+        }
+        return result;
+    }
+
+    private static Map<String, String> getPairs(String value) {
+        return getPairs(value, false);
+    }
+
+    private static Map<String, String> getPairs(String value, boolean base64) {
+        LinkedHashMap<String, String> result = new LinkedHashMap<>();
+        String[] pairs = value.split(",");
+        for (String pair : pairs) {
+            int colonIdx = pair.indexOf(':');
+            if (colonIdx > 0 && colonIdx < pair.length() - 1) {
+                String filename = pair.substring(0, colonIdx);
+                String fileurl = pair.substring(colonIdx + 1);
+                if(base64) {
+                    byte[] srcDecoded = java.util.Base64.getDecoder().decode(fileurl);
+                    fileurl = new String(srcDecoded);
+                }
+                result.put(filename, fileurl);
             }
         }
         return result;
@@ -180,5 +184,7 @@ class pderun {
         PdePreprocessor.builderFor("processingApp" + sha256hex).setTabSize(2).build().write(writer, finalSource);
         writer.close();
     }
+
+   
 }
 
