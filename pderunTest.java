@@ -16,7 +16,7 @@ import java.nio.file.Paths;
 import org.junit.jupiter.api.Test;
 
 // Run this with junit:
-// jbang build pderunTest.java && jbang --java 22 cli@junit-team --class-path `jbang info classpath pderunTest.java` --scan-classpath
+// `jbang build genTest.java; jbang --java 22 cli@junit-team --class-path `jbang genTest.java` --scan-classpath
 public class pderunTest {
 
     // Define each Unit test here and run them separately in the IDE
