@@ -1,5 +1,6 @@
 ///usr/bin/env jbang "$0" "$@" ; exit $?
 //DEPS org.processing:preprocessor:4.4.4
+//DEPS info.picocli:picocli:4.7.5
 //REPOS central,https://jogamp.org/deployment/maven
 
 //JAVA 22+
@@ -18,12 +19,42 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
 import processing.mode.java.preproc.PdePreprocessor;
 import processing.mode.java.preproc.SketchException;
+import picocli.CommandLine;
+import picocli.CommandLine.*;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Parameters;
 
-class pderun {
+@Command(
+    name = "pderun",
+    mixinStandardHelpOptions = true,
+    version = "1.0",
+    description = "Process and run Processing sketches"
+)
+class pderun implements Callable<Integer> {
     
+    @Parameters(
+        index = "0",
+        description = "Source to process. Can be: '-' for stdin, 'pde://sketch/base64/...' URL, or directory path",
+        arity = "0..1"
+    )
+    private String source;
+    
+    @Option(
+        names = {"--stdin", "-s"},
+        description = "Read source from stdin"
+    )
+    private boolean readFromStdin = false;
+    
+    @Option(
+        names = {"--verbose", "-v"},
+        description = "Enable verbose output"
+    )
+    private boolean verbose = false;
+
     /** 
      * Describes a processing Dev environment
      */
@@ -119,18 +150,23 @@ class pderun {
         return result;
     }
 
-    public static void main(String[] args) throws IOException, SketchException, NoSuchAlgorithmException {
-       
+    @Override
+    public Integer call() throws IOException, SketchException, NoSuchAlgorithmException {
         String jbangDirectives = """
-            //DEPS org.processing:preprocessor:4.4.4
             //JAVA 22+
             //RUNTIME_OPTIONS --enable-native-access=ALL-UNNAMED
+            //REPOS central,https://jogamp.org/deployment/maven
+            //DEPS org.processing:preprocessor:4.4.4
             """;
 
         PDEData pdeData = new PDEData();
 
-        if (args.length > 0 && args[0].equals("-")) {
+        // Handle different input sources
+        if (readFromStdin || (source != null && source.equals("-"))) {
             // Read source from stdin
+            if (verbose) {
+                System.err.println("Reading from stdin...");
+            }
             StringBuilder sb = new StringBuilder();
             try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(System.in))) {
                 String line;
@@ -141,14 +177,23 @@ class pderun {
 
             String input = sb.toString().trim();
             if (input.startsWith("pde://sketch/base64/")) {
+                if (verbose) {
+                    System.err.println("Processing PDE URL from stdin");
+                }
                 pdeData = decodePdeUrl(input);
             } else {
                 pdeData.source = input;
             }
-        } else if (args.length > 0 && args[0].startsWith("pde://sketch/base64/")) {
-            pdeData = decodePdeUrl(args[0]);
-        } else if (args.length > 0 && Files.isDirectory(Paths.get(args[0]))) {
-            String dir = args[0];
+        } else if (source != null && source.startsWith("pde://sketch/base64/")) {
+            if (verbose) {
+                System.err.println("Processing PDE URL: " + source);
+            }
+            pdeData = decodePdeUrl(source);
+        } else if (source != null && Files.isDirectory(Paths.get(source))) {
+            if (verbose) {
+                System.err.println("Processing directory: " + source);
+            }
+            String dir = source;
             String firstfile = null;
             pdeData = new PDEData();
 
@@ -170,10 +215,14 @@ class pderun {
                 pdeData.extraSources.remove(firstfile);
             }
             
-        } else {
-            System.err.println("No source provided");
-            System.exit(1);
+        } else if (source == null && !readFromStdin) {
+            System.err.println("No source provided. Use --help for usage information.");
+            return 1;
+        } else if (source != null) {
+            System.err.println("Invalid source: " + source);
+            return 1;
         }
+        
         String finalSource = pdeData.combinedSources();
 
         var writer = new OutputStreamWriter(System.out);
@@ -183,8 +232,13 @@ class pderun {
         writer.write(jbangDirectives + pdeData.filesDirectives() + "\n\n");
         PdePreprocessor.builderFor("processingApp" + sha256hex).setTabSize(2).build().write(writer, finalSource);
         writer.close();
+        
+        return 0;
     }
 
-   
+    public static void main(String[] args) {
+        int exitCode = new CommandLine(new pderun()).execute(args);
+        System.exit(exitCode);
+    }
 }
 
